@@ -12,13 +12,3 @@ Estructura estándar para un proyecto de Machine Learning enfocado en forecastin
 
 ## Requisitos
 Ver `requirements.txt` para dependencias.
-
-## Uso rápido
-1. Coloca los datos en `data/raw/`.
-2. Usa los notebooks en `notebooks/` para análisis y modelado.
-3. Guarda modelos en `models/`.
-4. Ejecuta la app de Streamlit desde la carpeta `app/`.
-
----
-
-¡Personaliza este README según las necesidades de tu proyecto!
