@@ -5,8 +5,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import joblib
 from datetime import datetime
-import warnings
-warnings.filterwarnings('ignore')
 
 # Configuración de la página
 st.set_page_config(
@@ -88,16 +86,11 @@ def predecir_recursivo(df_producto, modelo, columnas_modelo):
         pred = modelo.predict(X)[0]
         predicciones.append(pred)
         
-        # Actualizar lags para el siguiente día (si no es el último)
         if idx < len(df_pred) - 1:
-            # Desplazar lags
-            df_pred.loc[idx + 1, 'lag_7'] = df_pred.loc[idx, 'lag_6']
-            df_pred.loc[idx + 1, 'lag_6'] = df_pred.loc[idx, 'lag_5']
-            df_pred.loc[idx + 1, 'lag_5'] = df_pred.loc[idx, 'lag_4']
-            df_pred.loc[idx + 1, 'lag_4'] = df_pred.loc[idx, 'lag_3']
-            df_pred.loc[idx + 1, 'lag_3'] = df_pred.loc[idx, 'lag_2']
-            df_pred.loc[idx + 1, 'lag_2'] = df_pred.loc[idx, 'lag_1']
-            df_pred.loc[idx + 1, 'lag_1'] = pred
+            n_lags = sum(1 for c in df_pred.columns if c.startswith("lag_"))
+            for k in range(n_lags, 1, -1):
+                df_pred.loc[idx + 1, f"lag_{k}"] = df_pred.loc[idx, f"lag_{k-1}"]
+            df_pred.loc[idx + 1, "lag_1"] = pred
             
             # Actualizar media móvil
             ultimas_7 = predicciones[-7:] if len(predicciones) >= 7 else predicciones
@@ -264,10 +257,6 @@ if st.session_state.simulacion_ejecutada and st.session_state.resultados is not 
     precio_promedio = df_ajustado['precio_venta'].mean()
     descuento_promedio = df_ajustado['porcentaje_descuento'].mean()
     
-    # Información de los parámetros usados
-    st.info(f"📋 **Última simulación:** Descuento {resultados['ajuste_descuento']:+d}% | Escenario: {resultados['escenario_competencia']}")
-        
-# Información de los parámetros usados
     st.info(f"📋 **Última simulación:** Descuento {resultados['ajuste_descuento']:+d}% | Escenario: {resultados['escenario_competencia']}")
         
     # ====================
