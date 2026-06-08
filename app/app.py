@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import joblib
 from datetime import datetime
 
-# Configuración de la página
 st.set_page_config(
     page_title="Simulador de Ventas",
     page_icon="📊",
@@ -40,7 +39,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Función para cargar datos y modelo
 @st.cache_resource
 def cargar_modelo():
     """Carga el modelo entrenado"""
@@ -62,14 +60,12 @@ def cargar_datos():
         st.error(f"❌ Error al cargar los datos: {e}")
         return None
 
-# Función para obtener columnas del modelo
 def obtener_columnas_modelo(modelo):
     """Extrae las columnas que espera el modelo"""
     if hasattr(modelo, 'feature_names_in_'):
         return modelo.feature_names_in_.tolist()
     return None
 
-# Función para realizar predicciones recursivas
 def predecir_recursivo(df_producto, modelo, columnas_modelo):
     """
     Realiza predicciones día por día actualizando los lags recursivamente
@@ -79,10 +75,8 @@ def predecir_recursivo(df_producto, modelo, columnas_modelo):
     predicciones = []
     
     for idx in range(len(df_pred)):
-        # Preparar features para predicción
         X = df_pred.loc[[idx], columnas_modelo]
         
-        # Predecir
         pred = modelo.predict(X)[0]
         predicciones.append(pred)
         
@@ -92,29 +86,24 @@ def predecir_recursivo(df_producto, modelo, columnas_modelo):
                 df_pred.loc[idx + 1, f"lag_{k}"] = df_pred.loc[idx, f"lag_{k-1}"]
             df_pred.loc[idx + 1, "lag_1"] = pred
             
-            # Actualizar media móvil
             ultimas_7 = predicciones[-7:] if len(predicciones) >= 7 else predicciones
             df_pred.loc[idx + 1, 'media_movil_7d'] = np.mean(ultimas_7)
     
     return predicciones
 
-# Función para aplicar ajustes de simulación
 def aplicar_ajustes(df_producto, ajuste_descuento, escenario_competencia):
     """
     Aplica los ajustes de descuento y competencia al dataframe
     """
     df_ajustado = df_producto.copy()
     
-    # Ajustar descuento y precio_venta
     factor_descuento = 1 + (ajuste_descuento / 100)
     descuento_actual = (df_ajustado['precio_base'] - df_ajustado['precio_venta']) / df_ajustado['precio_base']
     nuevo_descuento = descuento_actual * factor_descuento
-    nuevo_descuento = nuevo_descuento.clip(0, 0.5)  # Limitar entre 0% y 50%
-    
+    nuevo_descuento = nuevo_descuento.clip(0, 0.5)    
     df_ajustado['precio_venta'] = df_ajustado['precio_base'] * (1 - nuevo_descuento)
     df_ajustado['porcentaje_descuento'] = nuevo_descuento * 100
     
-    # Ajustar precios de competencia
     if escenario_competencia == "Competencia -5%":
         factor_comp = 0.95
     elif escenario_competencia == "Competencia +5%":
@@ -122,43 +111,34 @@ def aplicar_ajustes(df_producto, ajuste_descuento, escenario_competencia):
     else:
         factor_comp = 1.0
     
-    # Ajustar precios individuales de competidores si existen
     competidores = ['Amazon', 'Decathlon', 'Deporvillage']
     for comp in competidores:
         if comp in df_ajustado.columns:
             df_ajustado[comp] = df_ajustado[comp] * factor_comp
     
-    # Recalcular precio_competencia
     df_ajustado['precio_competencia'] = df_ajustado['precio_competencia'] * factor_comp
     
-    # Recalcular ratio_precio
     df_ajustado['ratio_precio'] = df_ajustado['precio_venta'] / df_ajustado['precio_competencia']
     
     return df_ajustado
 
-# Cargar modelo y datos
 modelo = cargar_modelo()
 df_inferencia = cargar_datos()
 
 if modelo is None or df_inferencia is None:
     st.stop()
 
-# Obtener columnas del modelo
 columnas_modelo = obtener_columnas_modelo(modelo)
 
-# Inicializar session_state
 if 'simulacion_ejecutada' not in st.session_state:
     st.session_state.simulacion_ejecutada = False
 if 'resultados' not in st.session_state:
     st.session_state.resultados = None
 
-# ====================
 # SIDEBAR - CONTROLES
-# ====================
 st.sidebar.markdown("# 🎛️ Controles de Simulación")
 st.sidebar.markdown("---")
 
-# Selector de producto
 productos = sorted(df_inferencia['nombre'].unique().tolist())
 producto_seleccionado = st.sidebar.selectbox(
     "📦 Selecciona un producto:",
@@ -166,7 +146,6 @@ producto_seleccionado = st.sidebar.selectbox(
     help="Elige el producto que deseas simular"
 )
 
-# Slider de descuento
 st.sidebar.markdown("### 💰 Ajuste de Descuento")
 ajuste_descuento = st.sidebar.slider(
     "Modificar descuento actual:",
@@ -178,7 +157,6 @@ ajuste_descuento = st.sidebar.slider(
     help="Ajusta el descuento actual. Ej: +20% aumenta el descuento actual en un 20%"
 )
 
-# Escenario de competencia
 st.sidebar.markdown("### 🏪 Escenario de Competencia")
 escenario_competencia = st.sidebar.radio(
     "Selecciona el escenario:",
@@ -186,18 +164,12 @@ escenario_competencia = st.sidebar.radio(
     help="Simula cambios en los precios de la competencia"
 )
 
-# Botón de simulación
 st.sidebar.markdown("---")
 simular = st.sidebar.button("🚀 Simular Ventas", type="primary", use_container_width=True)
 
 st.sidebar.markdown("---")
 st.sidebar.info("💡 **Tip:** Ajusta los controles y presiona 'Simular Ventas' para ver las proyecciones.")
 
-# ====================
-# ZONA PRINCIPAL
-# ====================
-
-# Header
 st.markdown(f"# 📊 Dashboard de Simulación - Noviembre 2025")
 st.markdown(f"### Producto: **{producto_seleccionado}**")
 st.markdown("---")
@@ -205,21 +177,16 @@ st.markdown("---")
 # Ejecutar simulación cuando se presiona el botón
 if simular:
     with st.spinner("🔄 Procesando predicciones recursivas..."):
-        # Filtrar datos del producto
         df_producto = df_inferencia[df_inferencia['nombre'] == producto_seleccionado].copy()
         
-        # Aplicar ajustes
         df_ajustado = aplicar_ajustes(df_producto, ajuste_descuento, escenario_competencia)
         
-        # Realizar predicciones recursivas
         predicciones = predecir_recursivo(df_ajustado, modelo, columnas_modelo)
         
-        # Agregar predicciones al dataframe
         df_ajustado = df_ajustado.sort_values('fecha').reset_index(drop=True)
         df_ajustado['unidades_predichas'] = predicciones
         df_ajustado['ingresos_proyectados'] = df_ajustado['unidades_predichas'] * df_ajustado['precio_venta']
         
-        # Calcular comparativa de escenarios
         escenarios = ["Actual (0%)", "Competencia -5%", "Competencia +5%"]
         resultados_escenarios = {}
         
@@ -235,7 +202,6 @@ if simular:
                 'ingresos': df_esc_sorted['ingresos_proyectados'].sum()
             }
         
-        # Guardar en session_state
         st.session_state.resultados = {
             'df_ajustado': df_ajustado,
             'producto': producto_seleccionado,
@@ -245,13 +211,11 @@ if simular:
         }
         st.session_state.simulacion_ejecutada = True
 
-# Mostrar resultados si existe una simulación
 if st.session_state.simulacion_ejecutada and st.session_state.resultados is not None:
     resultados = st.session_state.resultados
     df_ajustado = resultados['df_ajustado']
     resultados_escenarios = resultados['resultados_escenarios']
     
-    # Calcular KPIs
     unidades_totales = df_ajustado['unidades_predichas'].sum()
     ingresos_totales = df_ajustado['ingresos_proyectados'].sum()
     precio_promedio = df_ajustado['precio_venta'].mean()
@@ -259,9 +223,7 @@ if st.session_state.simulacion_ejecutada and st.session_state.resultados is not 
     
     st.info(f"📋 **Última simulación:** Descuento {resultados['ajuste_descuento']:+d}% | Escenario: {resultados['escenario_competencia']}")
         
-    # ====================
     # KPIs DESTACADOS
-    # ====================
     st.markdown("## 📈 Indicadores Clave")
     col1, col2, col3, col4 = st.columns(4)
     
@@ -296,24 +258,19 @@ if st.session_state.simulacion_ejecutada and st.session_state.resultados is not 
     st.markdown("---")
     st.markdown("---")
         
-    # ====================
     # GRÁFICO DE PREDICCIÓN DIARIA
-    # ====================
     st.markdown("## 📅 Predicción Diaria de Ventas")
     
     fig, ax = plt.subplots(figsize=(14, 6))
     
-    # Estilo seaborn
     sns.set_style("whitegrid")
     
-    # Gráfico de línea
     dias = df_ajustado['dia_mes'].values
     ventas = df_ajustado['unidades_predichas'].values
     
     ax.plot(dias, ventas, marker='o', linewidth=2.5, markersize=6, 
             color='#667eea', label='Unidades Predichas')
     
-    # Marcar Black Friday (día 28)
     idx_bf = df_ajustado[df_ajustado['dia_mes'] == 28].index[0]
     dia_bf = df_ajustado.loc[idx_bf, 'dia_mes']
     ventas_bf = df_ajustado.loc[idx_bf, 'unidades_predichas']
@@ -338,23 +295,16 @@ if st.session_state.simulacion_ejecutada and st.session_state.resultados is not 
     st.markdown("---")
     st.markdown("---")
         
-    # ====================
-    # TABLA DETALLADA
-    # ====================
     st.markdown("## 📋 Detalle Diario")
     
-    # Preparar tabla
     df_tabla = df_ajustado[['fecha', 'dia_mes', 'precio_venta', 'precio_competencia', 
                              'porcentaje_descuento', 'unidades_predichas', 'ingresos_proyectados']].copy()
     
-    # Añadir día de la semana
     dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
     df_tabla['dia_semana'] = df_tabla['fecha'].dt.dayofweek.map(lambda x: dias_semana[x])
     
-    # Marcar Black Friday
     df_tabla['Black Friday'] = df_tabla['dia_mes'].apply(lambda x: '🛍️' if x == 28 else '')
     
-    # Formatear columnas
     df_tabla['Fecha'] = df_tabla['fecha'].dt.strftime('%d/%m/%Y')
     df_tabla['Día'] = df_tabla['dia_semana']
     df_tabla['Precio Venta'] = df_tabla['precio_venta'].apply(lambda x: f"{x:.2f} €")
@@ -363,11 +313,9 @@ if st.session_state.simulacion_ejecutada and st.session_state.resultados is not 
     df_tabla['Unidades'] = df_tabla['unidades_predichas'].apply(lambda x: f"{int(x):,}")
     df_tabla['Ingresos'] = df_tabla['ingresos_proyectados'].apply(lambda x: f"{x:,.2f} €")
     
-    # Seleccionar columnas finales
     df_display = df_tabla[['Black Friday', 'Fecha', 'Día', 'Precio Venta', 'Precio Competencia', 
                             'Descuento', 'Unidades', 'Ingresos']]
     
-    # Mostrar tabla con estilo
     st.dataframe(
         df_display,
         use_container_width=True,
@@ -378,9 +326,6 @@ if st.session_state.simulacion_ejecutada and st.session_state.resultados is not 
     st.markdown("---")
     st.markdown("---")
         
-    # ====================
-    # COMPARATIVA DE ESCENARIOS
-    # ====================
     st.markdown("## 🔄 Comparativa de Escenarios de Competencia")
     st.markdown("*Comparación manteniendo el descuento seleccionado y variando solo los precios de competencia*")
     
@@ -432,10 +377,8 @@ if st.session_state.simulacion_ejecutada and st.session_state.resultados is not 
     st.success("✅ Simulación completada con éxito")
 
 else:
-    # Mostrar instrucciones iniciales
     st.info("👈 Configura los parámetros en el panel lateral y presiona **'Simular Ventas'** para comenzar.")
     
-    # Mostrar información del producto seleccionado
     df_producto_info = df_inferencia[df_inferencia['nombre'] == producto_seleccionado].iloc[0]
     
     col1, col2 = st.columns(2)
@@ -454,7 +397,6 @@ else:
         st.write("3️⃣ Elige un escenario de competencia")
         st.write("4️⃣ Presiona 'Simular Ventas'")
 
-# Footer
 st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: #667eea;'>"
